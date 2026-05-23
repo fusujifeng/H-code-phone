@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AI 指挥中心</title>
+<style>
+  :root {
+    --accent: #4F6CEB;
+    --accent-rgb: 79, 108, 235;
+    --accent-glow: rgba(79, 108, 235, 0.30);
+    --bg: #F6F7FB;
+    --surface: rgba(255, 255, 255, 0.78);
+    --fg: #181B2E;
+    --muted: #9094A8;
+    --border: rgba(0, 0, 0, 0.06);
+    --border-strong: rgba(0, 0, 0, 0.10);
+    --glass: rgba(255, 255, 255, 0.70);
+    --glass-border: rgba(255, 255, 255, 0.50);
+    --bubble-ai-bg: #FFFFFF;
+    --bubble-ai-border: rgba(0, 0, 0, 0.06);
+    --input-bg: rgba(255, 255, 255, 0.78);
+    --input-border: rgba(0, 0, 0, 0.08);
+    --overlay-bg: rgba(0, 0, 0, 0.40);
+    --drawer-bg: rgba(255, 255, 255, 0.94);
+    --status-fg: #181B2E;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --t: 0.4s;
+  }
+
+  .t-deepseek {
+    --accent: #4F6CEB; --accent-rgb: 79, 108, 235; --accent-glow: rgba(79, 108, 235, 0.30);
+    --bg: #F6F7FB; --surface: rgba(255, 255, 255, 0.78); --fg: #181B2E; --muted: #9094A8;
+    --border: rgba(0, 0, 0, 0.06); --border-strong: rgba(0, 0, 0, 0.10);
+    --glass: rgba(255, 255, 255, 0.70); --glass-border: rgba(255, 255, 255, 0.50);
+    --bubble-ai-bg: #FFF; --bubble-ai-border: rgba(0, 0, 0, 0.06);
+    --input-bg: rgba(255, 255, 255, 0.78); --input-border: rgba(0, 0, 0, 0.08);
+    --overlay-bg: rgba(0, 0, 0, 0.40); --drawer-bg: rgba(255, 255, 255, 0.94); --status-fg: #181B2E;
+  }
+  .t-claude {
+    --accent: #D9744B; --accent-rgb: 217, 116, 75; --accent-glow: rgba(217, 116, 75, 0.28);
+    --bg: #FCF9F6; --surface: rgba(255, 255, 255, 0.76); --fg: #241A14; --muted: #9B8676;
+    --border: rgba(0, 0, 0, 0.05); --border-strong: rgba(0, 0, 0, 0.08);
+    --glass: rgba(255, 255, 255, 0.66); --glass-border: rgba(255, 255, 255, 0.45);
+    --bubble-ai-bg: #FFFBF8; --bubble-ai-border: rgba(0, 0, 0, 0.05);
+    --input-bg: rgba(255, 255, 255, 0.76); --input-border: rgba(0, 0, 0, 0.07);
+    --overlay-bg: rgba(0, 0, 0, 0.40); --drawer-bg: rgba(255, 255, 255, 0.94); --status-fg: #241A14;
+  }
+  .t-trae {
+    --accent: #12B886; --accent-rgb: 18, 184, 134; --accent-glow: rgba(18, 184, 134, 0.28);
+    --bg: #191C1D; --surface: rgba(40, 44, 46, 0.68); --fg: #E4E6EA; --muted: #7A8A82;
+    --border: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.12);
+    --glass: rgba(40, 44, 46, 0.58); --glass-border: rgba(255, 255, 255, 0.06);
+    --bubble-ai-bg: #25292B; --bubble-ai-border: rgba(255, 255, 255, 0.08);
+    --input-bg: rgba(40, 44, 46, 0.65); --input-border: rgba(255, 255, 255, 0.10);
+    --overlay-bg: rgba(0, 0, 0, 0.55); --drawer-bg: rgba(25, 28, 29, 0.96); --status-fg: #E4E6EA;
+  }
+  .t-apple {
+    --accent: #007AFF; --accent-rgb: 0, 122, 255; --accent-glow: rgba(0, 122, 255, 0.22);
+    --bg: #FFFFFF; --surface: rgba(255, 255, 255, 0.80); --fg: #1C1C1E; --muted: #8E8E93;
+    --border: rgba(0, 0, 0, 0.07); --border-strong: rgba(0, 0, 0, 0.12);
+    --glass: rgba(255, 255, 255, 0.72); --glass-border: rgba(255, 255, 255, 0.55);
+    --bubble-ai-bg: #F5F5F5; --bubble-ai-border: rgba(0, 0, 0, 0.06);
+    --input-bg: #F5F5F5; --input-border: rgba(0, 0, 0, 0.10);
+    --overlay-bg: rgba(0, 0, 0, 0.40); --drawer-bg: rgba(255, 255, 255, 0.94); --status-fg: #1C1C1E;
+  }
+
+  *, *::before, *::after { box-sizing: border-box }
+  body {
+    margin: 0; padding: 0;
+    background: #0D0D12;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: grid; place-items: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .phone {
+    width: 390px; height: 844px; border-radius: 56px; padding: 12px;
+    background: linear-gradient(160deg, #2F2F33, #1C1C20 50%, #121216);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset,
+                0 0 0 2px #000 inset,
+                0 32px 64px -12px rgba(0,0,0,0.55),
+                0 12px 24px -8px rgba(0,0,0,0.4);
+    position: relative; isolation: isolate;
+  }
+  .phone .btn-rail { position: absolute; width: 4px; background: #0E0E11; border-radius: 2px }
+  .phone .l1 { left: -3px; top: 174px; height: 32px }
+  .phone .l2 { left: -3px; top: 220px; height: 60px }
+  .phone .l3 { left: -3px; top: 290px; height: 60px }
+  .phone .r1 { right: -3px; top: 250px; height: 100px }
+  .phone .island {
+    position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+    width: 124px; height: 36px; background: #000; border-radius: 999px; z-index: 40;
+  }
+
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    background: var(--bg); border-radius: 44px; overflow: clip;
+    display: flex; flex-direction: column; transition: background var(--t);
+  }
+
+  .sbar {
+    flex: 0 0 47px; padding: 18px 28px 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--status-fg); z-index: 20; transition: color var(--t);
+  }
+  .sbar .r { display: inline-flex; align-items: center; gap: 6px }
+  .sbar svg { width: 17px; height: 11px; fill: var(--status-fg); transition: fill var(--t) }
+  .sbar .bat { width: 25px }
+
+  .topbar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+    padding: 10px 18px;
+    background: var(--glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border); transition: all var(--t); z-index: 15;
+  }
+  .topbar .hamburger {
+    width: 36px; height: 36px; border: 0;
+    background: rgba(var(--accent-rgb), 0.08);
+    display: grid; place-items: center; border-radius: 50%;
+    color: var(--accent); cursor: pointer; flex: 0 0 auto; transition: all var(--t);
+  }
+  .topbar .hamburger:active { transform: scale(0.9) }
+  .topbar .hamburger svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2 }
+  .topbar .title-area { flex: 1; text-align: center }
+  .topbar .main-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--fg); margin: 0; transition: color var(--t);
+  }
+  .topbar .sub-status {
+    font-size: 11px; color: var(--accent);
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    margin: 1px 0 0; transition: color var(--t);
+  }
+  .topbar .sub-status::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); flex: 0 0 auto;
+  }
+  .topbar .settings-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: 0;
+    background: rgba(var(--accent-rgb), 0.08);
+    display: grid; place-items: center;
+    color: var(--accent); cursor: pointer;
+    flex: 0 0 auto; transition: all var(--t);
+  }
+  .topbar .settings-btn:active { transform: scale(0.9) }
+  .topbar .settings-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2 }
+
+  .recent-strip {
+    flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 16px 4px 16px;
+  }
+  .recent-card {
+    width: 100%;
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; box-shadow: var(--shadow);
+    transition: all .15s, background var(--t), border-color var(--t);
+  }
+  .recent-card:active { transform: scale(0.98) }
+  .rc-icon { width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto; display: grid; place-items: center; font-size: 16px }
+  .rc-body { flex: 1; min-width: 0 }
+  .rc-name {
+    font-weight: 600; font-size: 13px; color: var(--fg); margin: 0 0 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--t);
+  }
+  .rc-meta {
+    font-size: 11px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color var(--t);
+  }
+  .rc-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; align-self: flex-start; margin-top: 4px }
+  .rc-dot.g { background: #34C759 } .rc-dot.y { background: #FF9F0A }
+
+  .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden }
+  .mlist { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px }
+  .mlist::-webkit-scrollbar { display: none }
+  .bub {
+    max-width: 84%; padding: 14px 16px; border-radius: 20px;
+    font-size: 15px; line-height: 1.5;
+    animation: bIn .35s cubic-bezier(.22,.61,.36,1);
+    transition: background var(--t), border-color var(--t), color var(--t);
+  }
+  @keyframes bIn { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
+  .bub.ai {
+    align-self: flex-start; background: var(--bubble-ai-bg);
+    border: 1px solid var(--bubble-ai-border); border-bottom-left-radius: 8px;
+    color: var(--fg); box-shadow: var(--shadow);
+  }
+  .bub.me { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 8px }
+  .bub.me .vt { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.85; margin-bottom: 4px }
+  .bub.me .vt svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2 }
+  .bub.sys {
+    align-self: center; background: transparent; color: var(--muted);
+    font-size: 12px; padding: 6px 16px; max-width: 100%; text-align: center; transition: color var(--t);
+  }
+
+  .input-zone { flex: 0 0 auto; padding: 8px 16px 14px; position: relative }
+  .input-shell {
+    background: var(--input-bg); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 2px solid var(--input-border); border-radius: 22px;
+    padding: 12px 16px; position: relative; overflow: hidden;
+    transition: all var(--t), border-color .25s, box-shadow .25s;
+  }
+  .input-shell.focused { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.08) }
+  .input-shell.voicing {
+    border-color: var(--accent); box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0.12);
+    background: var(--accent); transition: all .3s;
+  }
+  .input-shell textarea {
+    width: 100%; border: 0; background: none; resize: none;
+    font: inherit; font-size: 16px; line-height: 1.45; color: var(--fg);
+    outline: none; min-height: 48px; max-height: 48px; padding: 0;
+    transition: color var(--t), opacity .2s;
+  }
+  .input-shell textarea::placeholder { color: var(--muted) }
+  .input-shell .input-row { display: flex; align-items: flex-end; gap: 8px }
+  .input-shell .mic-hint {
+    display: flex; align-items: center; gap: 4px; color: var(--muted);
+    font-size: 11px; white-space: nowrap; user-select: none;
+    transition: color var(--t), opacity .2s;
+  }
+  .input-shell .mic-hint svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2 }
+  .input-shell .send-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: 0;
+    background: var(--accent); color: #fff; cursor: pointer;
+    display: grid; place-items: center; flex: 0 0 auto;
+    transition: all var(--t), transform .15s; padding: 0; box-shadow: 0 2px 8px var(--accent-glow);
+  }
+  .input-shell .send-btn:active { transform: scale(0.9) }
+  .input-shell .send-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5 }
+
+  .voice-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 22px; opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .voicing .voice-overlay { opacity: 1 }
+  .voicing textarea, .voicing .mic-hint, .voicing .send-btn { opacity: 0; pointer-events: none }
+  .v-wave {
+    width: 3px; height: 20px; background: rgba(255, 255, 255, 0.92);
+    border-radius: 999px; animation: vw .5s ease infinite;
+  }
+  .v-wave:nth-child(1) { animation-delay: 0s } .v-wave:nth-child(2) { animation-delay: 0.06s }
+  .v-wave:nth-child(3) { animation-delay: 0.12s } .v-wave:nth-child(4) { animation-delay: 0.18s }
+  .v-wave:nth-child(5) { animation-delay: 0.24s } .v-wave:nth-child(6) { animation-delay: 0.30s }
+  .v-wave:nth-child(7) { animation-delay: 0.36s }
+  @keyframes vw { 0%, 100% { height: 6px } 50% { height: 30px } }
+
+  .v-label {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.85);
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .voicing .v-label { opacity: 1 }
+
+  .overlay {
+    position: absolute; inset: 0; background: var(--overlay-bg);
+    z-index: 25; opacity: 0; pointer-events: none;
+    transition: opacity .35s; border-radius: 44px; overflow: hidden;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto }
+
+  .drawer {
+    position: absolute; top: 0; bottom: 0; width: 300px; max-width: 82%;
+    background: var(--drawer-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+    z-index: 30; overflow-y: auto; display: flex; flex-direction: column;
+    transition: transform .35s cubic-bezier(.22,.61,.36,1);
+  }
+  .drawer::-webkit-scrollbar { display: none }
+  .drawer.left { left: 0; border-radius: 44px 0 0 44px; transform: translateX(-100%) }
+  .drawer.left.open { transform: translateX(0) }
+  .drawer.right { right: 0; border-radius: 0 44px 44px 0; transform: translateX(100%) }
+  .drawer.right.open { transform: translateX(0) }
+
+  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 12px }
+  .drawer-header h2 {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: var(--fg); transition: color var(--t);
+  }
+  .drawer-close {
+    width: 32px; height: 32px; border: 0;
+    background: rgba(var(--accent-rgb), 0.08); display: grid; place-items: center;
+    border-radius: 50%; color: var(--accent); cursor: pointer; transition: all var(--t);
+  }
+  .drawer-close:active { transform: scale(0.9) }
+  .drawer-close svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2 }
+  .drawer-body { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 10px }
+
+  .d-card {
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 14px 16px; cursor: pointer; box-shadow: var(--shadow);
+    transition: all .15s, background var(--t), border-color var(--t);
+  }
+  .d-card:active { transform: scale(0.985) }
+  .d-card .dc-top { display: flex; align-items: flex-start; gap: 12px }
+  .d-card .dc-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: 0 0 auto }
+  .dc-dot.g { background: #34C759 } .dc-dot.y { background: #FF9F0A } .dc-dot.x { background: var(--muted) }
+  .d-card .dc-body { flex: 1 }
+  .d-card .dc-name { font-weight: 600; font-size: 15px; color: var(--fg); margin: 0 0 3px; transition: color var(--t) }
+  .d-card .dc-desc { font-size: 12px; color: var(--muted); transition: color var(--t) }
+  .d-card .dc-meta { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 11px; color: var(--muted); transition: color var(--t) }
+
+  .d-section {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 6px 0 2px; margin: 0; transition: color var(--t);
+  }
+
+  .search-mini {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-radius: 12px;
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    color: var(--muted); font-size: 13px;
+    transition: all var(--t);
+  }
+  .search-mini svg { width: 15px; height: 15px; stroke: var(--muted); fill: none; stroke-width: 2 }
+
+  .sgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px }
+  .scard {
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 2px solid transparent; border-radius: 18px;
+    padding: 16px 12px; cursor: pointer; text-align: center;
+    box-shadow: var(--shadow); transition: all .2s, background var(--t), border-color var(--t);
+  }
+  .scard:active { transform: scale(0.95) }
+  .scard.on { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.10) }
+  .sdot { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.10) }
+  .sd-ds { background: linear-gradient(135deg, #4F6CEB, #7B68EE) }
+  .sd-cl { background: linear-gradient(135deg, #D9744B, #E8956E) }
+  .sd-tr { background: linear-gradient(135deg, #12B886, #20C997) }
+  .sd-ap { background: linear-gradient(135deg, #007AFF, #5AC8FA) }
+  .sn { font-size: 13px; font-weight: 600; margin: 0 0 2px; color: var(--fg); transition: color var(--t) }
+  .shx {
+    font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    font-size: 10px; color: var(--muted); transition: color var(--t);
+  }
+  .sttl {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 6px 0; margin: 0; transition: color var(--t);
+  }
+  .srow {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 15px 18px; background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border); border-radius: 14px; gap: 14px;
+    box-shadow: var(--shadow); transition: all var(--t);
+  }
+  .sl { font-size: 15px; font-weight: 500; color: var(--fg); transition: color var(--t) }
+  .sv { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 6px; transition: color var(--t) }
+  .sv svg { width: 16px; height: 16px; stroke: var(--muted); fill: none; stroke-width: 2 }
+  .tgl {
+    width: 51px; height: 31px; border-radius: 999px;
+    background: var(--border-strong); position: relative; flex: 0 0 auto;
+    cursor: pointer; border: 0; transition: background .2s;
+  }
+  .tgl.on { background: var(--accent); transition: background var(--t) }
+  .tgl::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 27px; height: 27px; border-radius: 50%;
+    background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.12); transition: transform .2s;
+  }
+  .tgl.on::after { transform: translateX(20px) }
+  .ver { text-align: center; padding: 14px; color: var(--muted); font-size: 13px; transition: color var(--t) }
+
+  /* Todo list (in-project mode) */
+  .todo-section {
+    flex: 0 0 auto; padding: 8px 16px 4px;
+    display: none; flex-direction: column; gap: 6px;
+  }
+  .todo-section.visible { display: flex }
+  .todo-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px;
+  }
+  .todo-header span {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    letter-spacing: 0.04em; text-transform: uppercase; transition: color var(--t);
+  }
+  .todo-header .todo-badge {
+    font-size: 11px; color: var(--accent); font-weight: 600;
+    background: rgba(var(--accent-rgb), 0.10);
+    padding: 2px 10px; border-radius: 999px; transition: all var(--t);
+  }
+  .todo-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 14px;
+    background: var(--surface); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    transition: all var(--t);
+  }
+  .todo-mark {
+    width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
+    display: grid; place-items: center;
+    border: 2px solid var(--border-strong); transition: all var(--t);
+  }
+  .todo-mark.done { background: var(--accent); border-color: var(--accent) }
+  .todo-mark.done::after {
+    content: ''; width: 5px; height: 9px;
+    border: solid #fff; border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translateY(-1px);
+  }
+  .todo-mark.running {
+    border-color: var(--accent); background: transparent;
+    animation: todoPulse 1.4s ease infinite;
+  }
+  .todo-mark.running::after {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: todoDot .7s ease infinite alternate;
+  }
+  @keyframes todoPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.25) }
+    50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0) }
+  }
+  @keyframes todoDot {
+    from { transform: scale(0.6); opacity: 0.4 }
+    to { transform: scale(1); opacity: 1 }
+  }
+  .todo-body { flex: 1; min-width: 0 }
+  .todo-title {
+    font-size: 13px; font-weight: 500; color: var(--fg);
+    margin: 0; transition: color var(--t);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .todo-title.finished { text-decoration: line-through; color: var(--muted) }
+  .todo-tag {
+    font-size: 10px; font-weight: 500;
+    padding: 2px 8px; border-radius: 999px;
+    flex: 0 0 auto; letter-spacing: 0.02em;
+  }
+  .todo-tag.active { background: rgba(var(--accent-rgb), 0.12); color: var(--accent) }
+  .todo-tag.wait { background: rgba(255, 159, 10, 0.12); color: #D48806 }
+
+  .hi { flex: 0 0 28px; position: relative }
+  .hi::after {
+    content: ''; position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+    width: 134px; height: 5px; background: var(--fg); border-radius: 999px; opacity: 0.20;
+    transition: background var(--t);
+  }
+
+  .toast {
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--fg); color: var(--bg);
+    padding: 10px 22px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    opacity: 0; pointer-events: none; transition: opacity .35s; z-index: 35; white-space: nowrap;
+  }
+  .toast.show { opacity: 1 }
+
+  .d-new-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 44px; background: var(--accent); color: #fff; border: 0;
+    border-radius: 14px; font: inherit; font-size: 14px; font-weight: 600;
+    box-shadow: 0 4px 16px var(--accent-glow);
+    cursor: pointer; margin-top: 4px; transition: all var(--t), transform .15s;
+  }
+  .d-new-btn:active { transform: scale(0.97) }
+  .d-new-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.5 }
+</style>
+</head>
+<body class="t-deepseek">
+
+<div class="phone">
+  <span class="btn-rail l1"></span><span class="btn-rail l2"></span>
+  <span class="btn-rail l3"></span><span class="btn-rail r1"></span>
+  <span class="island"></span>
+
+  <div class="screen">
+    <div class="sbar">
+      <span>9:41</span>
+      <span class="r">
+        <svg viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="0.6"/><rect x="4" y="5" width="3" height="6" rx="0.6"/><rect x="8" y="3" width="3" height="8" rx="0.6"/><rect x="12" y="0" width="3" height="11" rx="0.6"/></svg>
+        <svg viewBox="0 0 17 11"><path d="M8.5 1.5C5.5 1.5 2.7 2.6 0.5 4.6L2 6.1C3.8 4.5 6.1 3.6 8.5 3.6c2.4 0 4.7 0.9 6.5 2.5l1.5-1.5c-2.2-2-5-3.1-8-3.1zM3.5 7.6L5 9.1c1-0.9 2.2-1.4 3.5-1.4 1.3 0 2.5 0.5 3.5 1.4l1.5-1.5c-1.4-1.3-3.1-2-5-2-1.9 0-3.6 0.7-5 2zM6.5 10.6l2 2 2-2c-0.5-0.5-1.2-0.8-2-0.8s-1.5 0.3-2 0.8z"/></svg>
+        <svg class="bat" viewBox="0 0 25 11"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.45"/><rect x="22" y="3.5" width="1.5" height="4" rx="0.4" fill="currentColor" fill-opacity="0.45"/><rect x="2" y="2" width="18" height="7" rx="1.4" fill="currentColor"/></svg>
+      </span>
+    </div>
+
+    <div class="topbar">
+      <button class="hamburger" id="hamburger-btn" onclick="openTasks()" aria-label="项目列表">
+        <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <div class="title-area">
+        <p class="main-title" id="chat-title">AI 指挥中心</p>
+        <p class="sub-status">Claude Code 已连接</p>
+      </div>
+      <button class="settings-btn" onclick="openSettings()" aria-label="设置">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .33 1.82l.07.08a2 2 0 0 1-2.83 2.83l-.08-.07a1.7 1.7 0 0 0-1.82-.33 1.7 1.7 0 0 0-1.07 1.55V21a2 2 0 0 1-4 0v-.12a1.7 1.7 0 0 0-1.07-1.55 1.7 1.7 0 0 0-1.82.33l-.08.07a2 2 0 0 1-2.83-2.83l.07-.08a1.7 1.7 0 0 0 .33-1.82 1.7 1.7 0 0 0-1.55-1.07H3a2 2 0 0 1 0-4h.12a1.7 1.7 0 0 0 1.55-1.07 1.7 1.7 0 0 0-.33-1.82l-.07-.08a2 2 0 0 1 2.83-2.83l.08.07a1.7 1.7 0 0 0 1.82.33H9a1.7 1.7 0 0 0 1.07-1.55V3a2 2 0 0 1 4 0v.12a1.7 1.7 0 0 0 1.07 1.55 1.7 1.7 0 0 0 1.82-.33l.08-.07a2 2 0 0 1 2.83 2.83l-.07.08a1.7 1.7 0 0 0-.33 1.82V9a1.7 1.7 0 0 0 1.55 1.07H21a2 2 0 0 1 0 4h-.12a1.7 1.7 0 0 0-1.48 1.07z"/></svg>
+      </button>
+    </div>
+
+    <div class="recent-strip" id="recent-strip">
+      <div class="recent-card" onclick="loadProject('家庭装修助手')" data-project="家庭装修助手">
+        <div class="rc-icon" style="background:rgba(79,108,235,0.12);color:#4F6CEB">&#x1F3E0;</div>
+        <div class="rc-body">
+          <p class="rc-name">拆分用户认证模块，用 Go 重写</p>
+          <p class="rc-meta">家庭装修助手 · 14:32</p>
+        </div>
+        <div class="rc-dot g"></div>
+      </div>
+      <div class="recent-card" onclick="loadProject('电商后台重构')" data-project="电商后台重构">
+        <div class="rc-icon" style="background:rgba(217,116,75,0.12);color:#D9744B">&#x1F6D2;</div>
+        <div class="rc-body">
+          <p class="rc-name">编写 Docker Compose 开发环境</p>
+          <p class="rc-meta">电商后台重构 · 11:15</p>
+        </div>
+        <div class="rc-dot g"></div>
+      </div>
+      <div class="recent-card" onclick="loadProject('iOS 组件库迁移')" data-project="iOS 组件库迁移">
+        <div class="rc-icon" style="background:rgba(18,184,134,0.12);color:#12B886">&#x1F4F1;</div>
+        <div class="rc-body">
+          <p class="rc-name">SwiftUI Color Token 迁移脚本</p>
+          <p class="rc-meta">iOS 组件库迁移 · 昨天</p>
+        </div>
+        <div class="rc-dot y"></div>
+      </div>
+    </div>
+
+    <div class="todo-section" id="todo-section">
+      <div class="todo-header">
+        <span>AI 任务列表</span>
+        <span class="todo-badge" id="todo-badge">2 / 5</span>
+      </div>
+      <div id="todo-list"></div>
+    </div>
+
+    <div class="chat-area">
+      <div class="mlist" id="mlist">
+        <div class="bub sys">今天 14:32 · 对话开始</div>
+      </div>
+      <div class="input-zone">
+        <div class="input-shell" id="input-shell">
+          <div class="input-row">
+            <textarea id="chat-input" rows="2" placeholder="输入指令，或按住说话..."
+              onfocus="document.getElementById('input-shell').classList.add('focused')"
+              onblur="document.getElementById('input-shell').classList.remove('focused')"></textarea>
+            <button class="send-btn" aria-label="发送" onclick="sendText()">
+              <svg viewBox="0 0 24 24"><path d="m22 2-10 20-4-8-8-4z"/><path d="M22 2 10 12"/></svg>
+            </button>
+          </div>
+          <div class="mic-hint"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>长按输入框进入语音模式</div>
+          <div class="voice-overlay">
+            <div class="v-wave"></div><div class="v-wave"></div><div class="v-wave"></div><div class="v-wave"></div><div class="v-wave"></div><div class="v-wave"></div><div class="v-wave"></div>
+          </div>
+          <div class="v-label">正在聆听...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hi"></div>
+
+    <!-- Project list drawer (left) -->
+    <div class="overlay" id="task-overlay" onclick="closeTasks()"></div>
+    <div class="drawer left" id="task-drawer">
+      <div class="drawer-header">
+        <h2>项目</h2>
+        <button class="drawer-close" onclick="closeTasks()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="drawer-body">
+        <div class="search-mini">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          搜索项目...
+        </div>
+        <p class="d-section">活跃项目</p>
+        <div class="d-card" onclick="loadProject('家庭装修助手')">
+          <div class="dc-top"><div class="dc-dot g"></div><div class="dc-body"><p class="dc-name">家庭装修助手</p><p class="dc-desc">AI 辅助室内设计 · 3 个任务进行中</p></div></div>
+        </div>
+        <div class="d-card" onclick="loadProject('电商后台重构')">
+          <div class="dc-top"><div class="dc-dot g"></div><div class="dc-body"><p class="dc-name">电商后台重构</p><p class="dc-desc">Spring Boot → Go · 7 个任务进行中</p></div></div>
+        </div>
+        <div class="d-card" onclick="loadProject('iOS 组件库迁移')">
+          <div class="dc-top"><div class="dc-dot y"></div><div class="dc-body"><p class="dc-name">iOS 组件库迁移</p><p class="dc-desc">UIKit → SwiftUI · 2 个任务等待中</p></div></div>
+        </div>
+        <div class="d-card" onclick="loadProject('CI/CD 流水线优化')">
+          <div class="dc-top"><div class="dc-dot x"></div><div class="dc-body"><p class="dc-name">CI/CD 流水线优化</p><p class="dc-desc">构建 12min→3min · 已完成</p></div></div>
+        </div>
+        <button class="d-new-btn" onclick="newTask()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新项目</button>
+      </div>
+    </div>
+
+    <!-- Settings drawer (right) -->
+    <div class="overlay" id="settings-overlay" onclick="closeSettings()"></div>
+    <div class="drawer right" id="settings-drawer">
+      <div class="drawer-header">
+        <h2>设置</h2>
+        <button class="drawer-close" onclick="closeSettings()"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="drawer-body">
+        <p class="sttl">颜色主题</p>
+        <div class="sgrid" id="tgrid">
+          <div class="scard on" data-theme="deepseek" onclick="setTheme('deepseek', this)"><div class="sdot sd-ds"></div><p class="sn">DeepSeek 蓝</p><p class="shx">#4F6CEB</p></div>
+          <div class="scard" data-theme="claude" onclick="setTheme('claude', this)"><div class="sdot sd-cl"></div><p class="sn">Claude 橙</p><p class="shx">#D9744B</p></div>
+          <div class="scard" data-theme="trae" onclick="setTheme('trae', this)"><div class="sdot sd-tr"></div><p class="sn">Trae 绿</p><p class="shx">#12B886</p></div>
+          <div class="scard" data-theme="apple" onclick="setTheme('apple', this)"><div class="sdot sd-ap"></div><p class="sn">苹果白</p><p class="shx">#007AFF</p></div>
+        </div>
+        <p class="sttl">通用</p>
+        <div class="srow"><span class="sl">语音输入</span><button class="tgl on" onclick="this.classList.toggle('on')"></button></div>
+        <div class="srow"><span class="sl">语音语言</span><span class="sv">中文（普通话）<svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span></div>
+        <div class="srow"><span class="sl">松手自动发送</span><button class="tgl on" onclick="this.classList.toggle('on')"></button></div>
+        <div class="srow"><span class="sl">触觉反馈</span><button class="tgl on" onclick="this.classList.toggle('on')"></button></div>
+        <p class="sttl">连接</p>
+        <div class="srow"><span class="sl">桌面端 Claude Code</span><span class="sv" style="color:var(--accent)">已连接</span></div>
+        <div class="srow"><span class="sl">同步历史记录</span><button class="tgl on" onclick="this.classList.toggle('on')"></button></div>
+        <p class="sttl">关于</p>
+        <div class="srow"><span class="sl">版本</span><span class="sv">1.0.0 (Build 42)</span></div>
+        <div class="ver">AI 指挥中心 · <strong>v1.0.0</strong><br>手机端 Claude Code 远程控制</div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function() {
+  var TC = ['theme-deepseek', 'theme-claude', 'theme-trae', 'theme-apple'];
+  var TN = { deepseek: 'DeepSeek 蓝', claude: 'Claude 橙', trae: 'Trae 绿', apple: '苹果白' };
+
+  window.setTheme = function(id, el) {
+    document.body.classList.remove.apply(document.body.classList, TC);
+    document.body.classList.add('t-' + id);
+    document.querySelectorAll('#tgrid .scard').forEach(function(c) { c.classList.remove('on'); });
+    el.classList.add('on');
+    toast('主题：' + TN[id]);
+    localStorage.setItem('aicc-theme', id);
+  };
+
+  window.openTasks = function() {
+    document.getElementById('task-overlay').classList.add('show');
+    document.getElementById('task-drawer').classList.add('open');
+  };
+  window.closeTasks = function() {
+    document.getElementById('task-overlay').classList.remove('show');
+    document.getElementById('task-drawer').classList.remove('open');
+  };
+
+  window.openSettings = function() {
+    document.getElementById('settings-overlay').classList.add('show');
+    document.getElementById('settings-drawer').classList.add('open');
+  };
+  window.closeSettings = function() {
+    document.getElementById('settings-overlay').classList.remove('show');
+    document.getElementById('settings-drawer').classList.remove('open');
+  };
+
+  var currentProject = null;
+
+  var projectTodos = {
+    '家庭装修助手': [
+      { title: 'Go 项目结构初始化', status: 'done' },
+      { title: 'JWT 认证中间件', status: 'done' },
+      { title: '拆分用户认证模块', status: 'running' },
+      { title: '编写 User CRUD 接口', status: 'wait' },
+      { title: 'Docker Compose 部署配置', status: 'wait' }
+    ],
+    '电商后台重构': [
+      { title: '分析现有 Spring Boot 架构', status: 'done' },
+      { title: '编写 Docker 开发环境', status: 'running' },
+      { title: '提取共享工具模块', status: 'running' },
+      { title: 'API Gateway 流量切换', status: 'wait' },
+      { title: '全量回归测试', status: 'wait' }
+    ],
+    'iOS 组件库迁移': [
+      { title: 'UIKit 组件清单整理', status: 'done' },
+      { title: 'Color Token 迁移脚本', status: 'running' },
+      { title: 'Room → SwiftData 迁移', status: 'wait' },
+      { title: 'Snapshot 测试用例更新', status: 'wait' }
+    ],
+    'CI/CD 流水线优化': [
+      { title: '构建耗时分析', status: 'done' },
+      { title: 'GitHub Actions 重构', status: 'done' },
+      { title: '缓存策略优化', status: 'done' },
+      { title: '修复 CSV 编码问题', status: 'done' },
+      { title: 'Slack 通知集成', status: 'done' }
+    ]
+  };
+
+  function renderTodoList(name) {
+    var todos = projectTodos[name] || [
+      { title: '初始化项目结构', status: 'running' },
+      { title: '等待指令...', status: 'wait' }
+    ];
+    var container = document.getElementById('todo-list');
+    var doneCount = todos.filter(function(t) { return t.status === 'done'; }).length;
+    document.getElementById('todo-badge').textContent = doneCount + ' / ' + todos.length;
+    var html = '';
+    todos.forEach(function(t) {
+      var markClass = t.status === 'done' ? 'done' : (t.status === 'running' ? 'running' : '');
+      var titleClass = t.status === 'done' ? 'finished' : '';
+      var tag = t.status === 'running' ? '<span class="todo-tag active">进行中</span>' :
+               (t.status === 'wait' ? '<span class="todo-tag wait">等待中</span>' : '');
+      html += '<div class="todo-item">' +
+        '<div class="todo-mark ' + markClass + '"></div>' +
+        '<div class="todo-body"><p class="todo-title ' + titleClass + '">' + t.title + '</p></div>' +
+        tag +
+      '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  window.loadProject = function(name) {
+    currentProject = name;
+    document.getElementById('chat-title').textContent = name;
+    document.getElementById('recent-strip').style.display = 'none';
+    document.getElementById('todo-section').classList.add('visible');
+    renderTodoList(name);
+    var t = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('mlist').innerHTML = '<div class="bub sys">' + name + ' · 今天 ' + t + '</div>';
+    var hb = document.getElementById('hamburger-btn');
+    hb.setAttribute('onclick', 'goHome()');
+    hb.setAttribute('aria-label', '返回');
+    hb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M15 18 9 12l6-6"/></svg>';
+    closeTasks();
+    toast('已加载：' + name);
+  };
+
+  window.goHome = function() {
+    currentProject = null;
+    document.getElementById('chat-title').textContent = 'AI 指挥中心';
+    document.getElementById('recent-strip').style.display = 'flex';
+    document.getElementById('todo-section').classList.remove('visible');
+    var t = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('mlist').innerHTML = '<div class="bub sys">今天 ' + t + ' · 对话开始</div>';
+    var hb = document.getElementById('hamburger-btn');
+    hb.setAttribute('onclick', 'openTasks()');
+    hb.setAttribute('aria-label', '项目列表');
+    hb.innerHTML = '<svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>';
+    toast('回到首页');
+  };
+
+  window.newTask = function() {
+    closeTasks();
+    loadProject('新项目');
+    toast('新项目已创建');
+  };
+
+  var aiReplies = [
+    '收到，我来处理。<br><br>正在分析项目结构，稍后给出执行计划。',
+    '好的，已开始执行。<br><br>→ 创建项目骨架<br>→ 安装必要依赖<br>→ 编写核心逻辑<br>→ 运行测试验证<br><br>预计 2-3 分钟完成。',
+    '这个需求很清晰。微服务拆分建议三步走：<br><br>1. 先提取共享模块<br>2. 定义服务边界与通信协议<br>3. 逐个迁移并做流量验证<br><br>每一步都有回滚方案，现在开始？',
+    '已完成，所有改动已提交。<br><br>变更摘要：<br>+ 新增 3 个源文件<br>~ 修改 1 个配置<br>✓ 单元测试全部通过<br>✓ 集成测试通过',
+    '编译成功！Go build 完成，二进制 12.3MB。Docker 镜像已构建并推送，可以随时部署。'
+  ];
+
+  var voiceMsgs = [
+    '先把用户模块拆出来，用 Go 重写认证服务',
+    '对，现在就开始，代码写完通知我',
+    '帮我看一下这个错误是什么意思',
+    '把数据库连接池调到 50，重启服务',
+    '重构一下这个函数，太长了不好维护'
+  ];
+
+  function addMsg(type, text, isVoice, voiceDur) {
+    var ml = document.getElementById('mlist');
+    var d = document.createElement('div');
+    d.className = 'bub ' + type;
+    if (isVoice) {
+      d.innerHTML = '<div class="vt"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>语音 · 0:' + String(voiceDur).padStart(2, '0') + '</div>' + text;
+    } else {
+      d.innerHTML = text;
+    }
+    ml.appendChild(d);
+    ml.scrollTop = ml.scrollHeight;
+  }
+
+  window.sendText = function() {
+    var ta = document.getElementById('chat-input');
+    var txt = ta.value.trim();
+    if (!txt) return;
+    ta.value = '';
+    addMsg('me', txt, false, 0);
+    setTimeout(function() {
+      addMsg('ai', aiReplies[Math.floor(Math.random() * aiReplies.length)], false);
+    }, 600 + Math.random() * 800);
+  };
+
+  document.getElementById('chat-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+  });
+
+  var voiceTimer = null, voiceActive = false;
+  var shell = document.getElementById('input-shell');
+  var ta = document.getElementById('chat-input');
+
+  function startVoice(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    voiceTimer = setTimeout(function() {
+      voiceActive = true;
+      shell.classList.add('voicing');
+      shell.classList.add('focused');
+      ta.blur();
+    }, 400);
+  }
+
+  function stopVoice() {
+    clearTimeout(voiceTimer);
+    if (voiceActive) {
+      voiceActive = false;
+      shell.classList.remove('voicing');
+      shell.classList.remove('focused');
+      var msg = voiceMsgs[Math.floor(Math.random() * voiceMsgs.length)];
+      var dur = Math.floor(Math.random() * 7) + 3;
+      var existingText = ta.value.trim();
+      ta.value = '';
+      if (existingText) {
+        addMsg('me', existingText, false, 0);
+        setTimeout(function() { addMsg('me', msg, true, dur); }, 400);
+      } else {
+        addMsg('me', msg, true, dur);
+      }
+      setTimeout(function() {
+        addMsg('ai', aiReplies[Math.floor(Math.random() * aiReplies.length)], false);
+      }, 1200 + Math.random() * 1000);
+    }
+  }
+
+  shell.addEventListener('mousedown', startVoice);
+  shell.addEventListener('mouseup', stopVoice);
+  shell.addEventListener('mouseleave', stopVoice);
+  shell.addEventListener('touchstart', startVoice, { passive: false });
+  shell.addEventListener('touchend', stopVoice);
+  shell.addEventListener('touchcancel', stopVoice);
+
+  var toastTimer;
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.classList.remove('show'); }, 1800);
+  }
+
+  document.getElementById('task-overlay').addEventListener('click', closeTasks);
+  document.getElementById('settings-overlay').addEventListener('click', closeSettings);
+
+  var saved = localStorage.getItem('aicc-theme');
+  if (saved && TN[saved]) {
+    document.body.classList.remove.apply(document.body.classList, TC);
+    document.body.classList.add('t-' + saved);
+    document.querySelectorAll('#tgrid .scard').forEach(function(c) { c.classList.toggle('on', c.dataset.theme === saved); });
+  }
+})();
+</script>
+</body>
+</html>
