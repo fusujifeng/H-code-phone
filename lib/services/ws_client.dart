@@ -6,10 +6,12 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 enum WsStatus { disconnected, connecting, connected }
 
 class WsClient extends ChangeNotifier {
+  static const String defaultServerUrl = 'ws://124.221.115.70:8080/ws';
+
   WebSocketChannel? _channel;
   WsStatus _status = WsStatus.disconnected;
   String? _pairCode;
-  String _serverUrl = '';
+  final String _serverUrl = defaultServerUrl;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
   int _reconnectDelay = 1;
@@ -17,13 +19,13 @@ class WsClient extends ChangeNotifier {
 
   WsStatus get status => _status;
   String? get pairCode => _pairCode;
+  String get serverUrl => _serverUrl;
 
   final StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messages => _messageController.stream;
 
-  Future<void> connectAndRegister(String serverUrl, String pairCode) async {
-    _serverUrl = serverUrl;
+  Future<void> connectAndRegister(String pairCode) async {
     _pairCode = pairCode;
     _shouldReconnect = true;
     await _doConnectAndRegister();

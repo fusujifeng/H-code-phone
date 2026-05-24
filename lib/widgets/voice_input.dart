@@ -60,10 +60,15 @@ class _VoiceInputState extends State<VoiceInput>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: EdgeInsets.fromLTRB(
+        _isListening ? 0 : 16, 8, _isListening ? 0 : 16, 14),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
+        constraints: BoxConstraints(
+          minHeight: _isListening ? 112 : 0,
+        ),
         decoration: BoxDecoration(
           color: _isListening
               ? theme.colorScheme.primary

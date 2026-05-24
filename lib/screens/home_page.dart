@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,11 +27,67 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final ScrollController _scrollController = ScrollController();
+  bool _pairDialogShown = false;
+  String _aiResponseBuffer = '';
+  Timer? _aiResponseTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _listenToMessages());
+  }
+
+  void _showPairDialog() {
+    final pairController = TextEditingController();
+    bool connecting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return PopScope(
+          canPop: false,
+          child: StatefulBuilder(
+            builder: (builderCtx, setDialogState) {
+              return AlertDialog(
+                title: const Text('连接服务器'),
+                content: TextField(
+                  controller: pairController,
+                  decoration: const InputDecoration(
+                    hintText: '请输入配对码',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  autofocus: true,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: connecting
+                        ? null
+                        : () async {
+                            final code = pairController.text.trim();
+                            if (code.isEmpty) return;
+                            setDialogState(() => connecting = true);
+                            try {
+                              await ref
+                                  .read(wsClientProvider)
+                                  .connectAndRegister(code);
+                            } finally {
+                              setDialogState(() => connecting = false);
+                            }
+                          },
+                    child: Text(connecting ? '连接中...' : '连接'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    ).then((_) {
+      _pairDialogShown = false;
+    });
   }
 
   void _listenToMessages() {
@@ -40,14 +97,24 @@ class _HomePageState extends ConsumerState<HomePage> {
       switch (type) {
         case 'ai_response':
           final payload = msg['payload'];
-          final content = payload is String ? payload : jsonEncode(payload);
-          if (content.trim().isEmpty) return;
-          ref.read(chatProvider.notifier).addMessage(ChatMessage(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                type: MessageType.ai,
-                content: content.trim(),
-                timestamp: DateTime.now(),
-              ));
+          String content = payload is String ? payload : jsonEncode(payload);
+          content = _stripAnsi(content).trim();
+          if (content.isEmpty) return;
+          // 累积并 debounce：桌面端已通过 --print 发送干净输出，短缓冲即可
+          _aiResponseBuffer += (_aiResponseBuffer.isEmpty ? '' : '\n') + content;
+          _aiResponseTimer?.cancel();
+          _aiResponseTimer = Timer(const Duration(milliseconds: 500), () {
+            final result = _aiResponseBuffer.trim();
+            _aiResponseBuffer = '';
+            if (result.isEmpty) return;
+            ref.read(chatProvider.notifier).removeThinking();
+            ref.read(chatProvider.notifier).addMessage(ChatMessage(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  type: MessageType.ai,
+                  content: result,
+                  timestamp: DateTime.now(),
+                ));
+          });
           break;
         case 'todo_update':
           final payload = msg['payload'];
@@ -82,6 +149,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
+    _aiResponseTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -93,11 +161,44 @@ class _HomePageState extends ConsumerState<HomePage> {
           content: text,
           timestamp: DateTime.now(),
         ));
+    ref.read(chatProvider.notifier).upsertThinking('');
     final ws = ref.read(wsClientProvider);
     if (ws.status == WsStatus.connected) {
       ws.sendCommand(text);
     }
     _scrollToBottom();
+  }
+
+  String _stripAnsi(String text) {
+    // Strip complete CSI sequences
+    text = text.replaceAll(RegExp(r'\x1b\[[0-9;?]*[A-Za-z]'), '');
+    // Strip OSC sequences
+    text = text.replaceAll(RegExp(r'\x1b\][^\x07]*\x07'), '');
+    text = text.replaceAll(RegExp(r'\x1b\][^\x1b]*\x1b\\'), '');
+    // Strip other ESC-prefixed sequences
+    text = text.replaceAll(RegExp(r'\x1b[PX^_][^\x1b]*\x1b\\?'), '');
+    text = text.replaceAll(RegExp(r'\x1b.'), '');
+    // Strip ANSI remnants where ESC was lost in transport
+    text = text.replaceAll(RegExp(r'\[[0-9;]+m'), '');
+    text = text.replaceAll(RegExp(r'\[[0-9;]*[KJhlsu]'), '');
+    // Strip braille spinners
+    text = text.replaceAll(RegExp(r'[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]'), '');
+    // Filter TUI status lines
+    final lines = text.split('\n');
+    final meaningful = lines.where((line) {
+      final t = line.trim();
+      if (t.isEmpty) return false;
+      if (RegExp(r'^\[.+\]\s*\|').hasMatch(t)) return false;
+      if (RegExp(r'^\([^)]*\*\)\s*$').hasMatch(t)) return false;
+      if (RegExp(r'^Context\s+\d+%').hasMatch(t)) return false;
+      if (RegExp(r'^\d+CLAUDE\.md').hasMatch(t)) return false;
+      if (RegExp(r'^\*\s*\w+\s+for\s+[\d.]+s').hasMatch(t)) return false;
+      if (RegExp(r'^\s*[↓↑]\s*\d+\s*token').hasMatch(t)) return false;
+      if (RegExp(r'^\d*thought\s+for\s+\d+s?\)?').hasMatch(t)) return false;
+      if (RegExp(r'^[*\s]*(thinking|Thought\.{2,})\)?').hasMatch(t)) return false;
+      return true;
+    });
+    return meaningful.join('\n');
   }
 
   void _scrollToBottom() {
@@ -119,6 +220,26 @@ class _HomePageState extends ConsumerState<HomePage> {
     final ws = ref.watch(wsClientProvider);
     final theme = Theme.of(context);
     final themeProvider = ThemeProviderScope.of(context);
+
+    ref.listen(wsClientProvider, (prev, next) {
+      if (next.status == WsStatus.connected && _pairDialogShown) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _pairDialogShown = false;
+      } else if (next.status == WsStatus.disconnected && !_pairDialogShown) {
+        _pairDialogShown = true;
+        _showPairDialog();
+      }
+    });
+
+    // Show pair dialog on first load if not connected
+    if (!_pairDialogShown && ws.status != WsStatus.connected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_pairDialogShown) {
+          _pairDialogShown = true;
+          _showPairDialog();
+        }
+      });
+    }
 
     final connStatusText = ws.status == WsStatus.connected
         ? 'Claude Code 已连接'
@@ -187,6 +308,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   isSystem: msg.type == MessageType.system,
                   isVoice: msg.isVoice,
                   voiceDuration: msg.voiceDuration,
+                  isThinking: msg.id.startsWith('thinking-'),
                 );
               },
             ),

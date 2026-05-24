@@ -18,25 +18,22 @@ class DrawerSettings extends ConsumerStatefulWidget {
 }
 
 class _DrawerSettingsState extends ConsumerState<DrawerSettings> {
-  final _serverUrlController = TextEditingController(text: 'ws://');
   final _pairCodeController = TextEditingController();
   bool _connecting = false;
 
   @override
   void dispose() {
-    _serverUrlController.dispose();
     _pairCodeController.dispose();
     super.dispose();
   }
 
   Future<void> _connect() async {
-    final serverUrl = _serverUrlController.text.trim();
     final pairCode = _pairCodeController.text.trim();
-    if (serverUrl.isEmpty || pairCode.isEmpty) return;
+    if (pairCode.isEmpty) return;
 
     setState(() => _connecting = true);
     try {
-      await ref.read(wsClientProvider).connectAndRegister(serverUrl, pairCode);
+      await ref.read(wsClientProvider).connectAndRegister(pairCode);
     } finally {
       if (mounted) setState(() => _connecting = false);
     }
@@ -104,8 +101,6 @@ class _DrawerSettingsState extends ConsumerState<DrawerSettings> {
                   ],
                 )),
             const SizedBox(height: 8),
-            _buildTextField('服务器地址', _serverUrlController, hint: 'ws://192.168.1.x:8080/ws'),
-            const SizedBox(height: 6),
             _buildTextField('配对码', _pairCodeController, hint: '6位数字'),
             const SizedBox(height: 10),
             Row(

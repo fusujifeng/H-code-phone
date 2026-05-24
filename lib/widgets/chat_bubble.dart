@@ -1,11 +1,65 @@
 import 'package:flutter/material.dart';
 
+class _ThinkingDots extends StatefulWidget {
+  const _ThinkingDots();
+
+  @override
+  State<_ThinkingDots> createState() => _ThinkingDotsState();
+}
+
+class _ThinkingDotsState extends State<_ThinkingDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final delay = i * 0.2;
+            final t = (_controller.value + delay) % 1.0;
+            final scale = 0.4 + 0.6 * (1.0 - ((t - 0.5).abs() * 2));
+            return Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withAlpha((120 + 135 * scale).round()),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
 class ChatBubble extends StatelessWidget {
   final String content;
   final bool isUser;
   final bool isVoice;
   final int? voiceDuration;
   final bool isSystem;
+  final bool isThinking;
 
   const ChatBubble({
     super.key,
@@ -14,6 +68,7 @@ class ChatBubble extends StatelessWidget {
     this.isVoice = false,
     this.voiceDuration,
     this.isSystem = false,
+    this.isThinking = false,
   });
 
   @override
@@ -30,6 +85,31 @@ class ChatBubble extends StatelessWidget {
               color: theme.colorScheme.onSurface.withAlpha(128),
               fontSize: 12,
             ),
+          ),
+        ),
+      );
+    }
+
+    if (isThinking) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.78,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withAlpha(30),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+                bottomLeft: Radius.circular(8),
+              ),
+            ),
+            child: const _ThinkingDots(),
           ),
         ),
       );
