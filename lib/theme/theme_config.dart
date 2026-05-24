@@ -83,7 +83,7 @@ class ThemeConfig {
     isDark: false,
   );
 
-  static const List<ThemeConfig> all = [deepseek, claude, trae, apple];
+  static const List<ThemeConfig> all = [claude, deepseek, trae, apple];
 
   ThemeData toThemeData() {
     final colorScheme = ColorScheme.fromSeed(

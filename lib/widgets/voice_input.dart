@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'animated_builder.dart';
 
 class VoiceInput extends StatefulWidget {
@@ -18,7 +19,10 @@ class VoiceInput extends StatefulWidget {
 class _VoiceInputState extends State<VoiceInput>
     with SingleTickerProviderStateMixin {
   final _textController = TextEditingController();
+  final _stt = stt.SpeechToText();
   bool _isListening = false;
+  bool _speechAvailable = false;
+  String _recognizedText = '';
   late AnimationController _waveController;
 
   @override
@@ -28,6 +32,14 @@ class _VoiceInputState extends State<VoiceInput>
       duration: const Duration(milliseconds: 550),
       vsync: this,
     );
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    final available = await _stt.initialize();
+    if (mounted) {
+      setState(() => _speechAvailable = available);
+    }
   }
 
   @override
@@ -38,14 +50,27 @@ class _VoiceInputState extends State<VoiceInput>
   }
 
   void _startListening() {
+    if (!_speechAvailable) return;
+    _recognizedText = '';
+    _stt.listen(
+      onResult: (result) {
+        setState(() => _recognizedText = result.recognizedWords);
+        widget.onVoiceResult(result.recognizedWords);
+      },
+      localeId: 'zh_CN',
+    );
     setState(() => _isListening = true);
     _waveController.repeat(reverse: true);
   }
 
   void _stopListening() {
+    _stt.stop();
     setState(() => _isListening = false);
     _waveController.stop();
     _waveController.reset();
+    if (_recognizedText.trim().isNotEmpty) {
+      _textController.text = _recognizedText.trim();
+    }
   }
 
   void _sendText() {
@@ -95,19 +120,7 @@ class _VoiceInputState extends State<VoiceInput>
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (_isListening) _buildWaveBars(),
-            if (_isListening)
-              const Positioned(
-                bottom: 8,
-                child: Text(
-                  '正在聆听...',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+            if (_isListening) _buildListeningContent(),
             IgnorePointer(
               ignoring: _isListening,
               child: AnimatedOpacity(
@@ -163,16 +176,55 @@ class _VoiceInputState extends State<VoiceInput>
                 ),
               ),
             ),
-            Positioned.fill(
-              child: GestureDetector(
-                onLongPressStart: (_) => _startListening(),
-                onLongPressEnd: (_) => _stopListening(),
-                onLongPressCancel: () => _stopListening(),
+            if (_speechAvailable)
+              Positioned.fill(
+                child: GestureDetector(
+                  onLongPressStart: (_) => _startListening(),
+                  onLongPressEnd: (_) => _stopListening(),
+                  onLongPressCancel: () => _stopListening(),
+                ),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildListeningContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 16),
+        _buildWaveBars(),
+        const SizedBox(height: 10),
+        if (_recognizedText.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              _recognizedText,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        const Spacer(),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Text(
+            '正在聆听...',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -201,4 +253,3 @@ class _VoiceInputState extends State<VoiceInput>
     );
   }
 }
-

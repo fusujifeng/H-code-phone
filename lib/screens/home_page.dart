@@ -25,21 +25,61 @@ class HomePage extends ConsumerStatefulWidget {
   ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> {
+class _HomePageState extends ConsumerState<HomePage>
+    with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   bool _pairDialogShown = false;
+  bool _autoConnectTried = false;
   String _aiResponseBuffer = '';
   Timer? _aiResponseTimer;
+  Timer? _backgroundDisconnectTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _listenToMessages());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _backgroundDisconnectTimer?.cancel();
+        _backgroundDisconnectTimer = null;
+        // 从后台回来：如果已断连且有保存的配对码，静默重连
+        final ws = ref.read(wsClientProvider);
+        if (ws.status == WsStatus.disconnected) {
+          ws.reconnectSilently();
+        }
+        break;
+      case AppLifecycleState.paused:
+        // 进入后台：3 分钟后断开连接
+        _backgroundDisconnectTimer?.cancel();
+        _backgroundDisconnectTimer = Timer(const Duration(minutes: 3), () {
+          ref.read(wsClientProvider).disconnectForBackground();
+        });
+        break;
+      case AppLifecycleState.detached:
+        _backgroundDisconnectTimer?.cancel();
+        ref.read(wsClientProvider).disconnectForBackground();
+        break;
+      default:
+        break;
+    }
   }
 
   void _showPairDialog() {
     final pairController = TextEditingController();
     bool connecting = false;
+
+    void tryConnect(String code, StateSetter setDialogState) {
+      if (code.length < 4 || connecting) return;
+      setDialogState(() => connecting = true);
+      ref.read(wsClientProvider).connectAndRegister(code).then((_) {
+        if (mounted) setDialogState(() => connecting = false);
+      });
+    }
 
     showDialog(
       context: context,
@@ -49,37 +89,39 @@ class _HomePageState extends ConsumerState<HomePage> {
           canPop: false,
           child: StatefulBuilder(
             builder: (builderCtx, setDialogState) {
+              pairController.addListener(() {
+                final code = pairController.text.trim();
+                if (code.length >= 4) {
+                  tryConnect(code, setDialogState);
+                }
+              });
               return AlertDialog(
                 title: const Text('连接服务器'),
-                content: TextField(
-                  controller: pairController,
-                  decoration: const InputDecoration(
-                    hintText: '请输入配对码',
-                    border: OutlineInputBorder(),
+                content: SizedBox(
+                  width: 200,
+                  child: TextField(
+                    controller: pairController,
+                    decoration: InputDecoration(
+                      hintText: '请输入4位配对码',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: connecting
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    autofocus: true,
                   ),
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  autofocus: true,
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: connecting
-                        ? null
-                        : () async {
-                            final code = pairController.text.trim();
-                            if (code.isEmpty) return;
-                            setDialogState(() => connecting = true);
-                            try {
-                              await ref
-                                  .read(wsClientProvider)
-                                  .connectAndRegister(code);
-                            } finally {
-                              setDialogState(() => connecting = false);
-                            }
-                          },
-                    child: Text(connecting ? '连接中...' : '连接'),
-                  ),
-                ],
               );
             },
           ),
@@ -149,7 +191,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _aiResponseTimer?.cancel();
+    _backgroundDisconnectTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -226,15 +270,35 @@ class _HomePageState extends ConsumerState<HomePage> {
         Navigator.of(context, rootNavigator: true).pop();
         _pairDialogShown = false;
       } else if (next.status == WsStatus.disconnected && !_pairDialogShown) {
-        _pairDialogShown = true;
-        _showPairDialog();
+        // 断连时：有保存配对码就静默重连，不弹窗打扰用户
+        ref.read(wsClientProvider).getSavedPairCode().then((code) {
+          if (code != null && mounted) {
+            ref.read(wsClientProvider).reconnectSilently();
+          } else if (mounted) {
+            _pairDialogShown = true;
+            _showPairDialog();
+          }
+        });
       }
     });
 
-    // Show pair dialog on first load if not connected
-    if (!_pairDialogShown && ws.status != WsStatus.connected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_pairDialogShown) {
+    // 首次加载：尝试已保存的配对码自动连接，只尝试一次
+    if (!_autoConnectTried && !_pairDialogShown && ws.status != WsStatus.connected) {
+      _autoConnectTried = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted || _pairDialogShown) return;
+        final savedCode = await ref.read(wsClientProvider).getSavedPairCode();
+        if (savedCode != null && mounted) {
+          ref.read(wsClientProvider).connectAndRegister(savedCode);
+          // 等 3 秒看是否连上，连不上就弹窗
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted && !_pairDialogShown &&
+                ref.read(wsClientProvider).status != WsStatus.connected) {
+              _pairDialogShown = true;
+              _showPairDialog();
+            }
+          });
+        } else if (mounted) {
           _pairDialogShown = true;
           _showPairDialog();
         }
@@ -315,7 +379,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           VoiceInput(
             onSend: _sendMessage,
-            onVoiceResult: (text) => _sendMessage(text),
+            onVoiceResult: (text) {},
           ),
         ],
       ),
